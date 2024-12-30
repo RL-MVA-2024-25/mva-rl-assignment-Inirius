@@ -7,8 +7,6 @@ import numpy as np
 import random
 from copy import deepcopy
 
-
-
 env = TimeLimit(
     env=HIVPatient(domain_randomization=False), max_episode_steps=200
 )  # The time wrapper limits the number of steps in an episode at 200.
@@ -57,14 +55,14 @@ class HIVcnn(nn.Module):
 class ProjectAgent:
 
     config0 = {'nb_actions': 4,
-          'learning_rate': 0.001,
+          'learning_rate': 0.005,
           'gamma': 0.95,
           'buffer_size': 10000,
           'epsilon_min': 0.01,
           'epsilon_max': 1.,
           'epsilon_decay_period': 1000,
           'epsilon_delay_decay': 20,
-          'batch_size': 20}
+          'batch_size': 30}
 
     def greedy_action(self,network, state):
         with torch.no_grad():
