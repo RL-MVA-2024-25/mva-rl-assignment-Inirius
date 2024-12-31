@@ -37,32 +37,36 @@ class ReplayBuffer:
 class HIVcnn(nn.Module):
     def __init__(self, in_channels=6, n_actions=4):
         super(HIVcnn, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, 16, kernel_size=(1, 1), stride=1)
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=(1, 1), stride=1)
+        self.fc_1 = nn.Linear(in_channels, 32)
+        #self.conv1 = nn.Conv2d(in_channels, 16, kernel_size=(4, 4), stride=1)
+        #self.conv2 = nn.Conv2d(16, 32, kernel_size=(4, 4), stride=1)
         self.fc1 = nn.Linear(32, 64)
         self.fc2 = nn.Linear(64, 64)
         self.head = nn.Linear(64, n_actions)
       
     def forward(self, x):
-        x = x.unsqueeze(2).unsqueeze(3)
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = x.view(x.size(0), -1)
+        #x = x.view(x.size(0), x.size(1), 4, 4)
+        #x = F.relu(self.conv1(x))
+        #x = F.relu(self.conv2(x))
+        #x = x.view(x.size(0), -1)
+        x = F.relu(self.fc_1(x))
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
+        x = F.relu(self.fc2(x)) # added a second layer
         return self.head(x)
 
 class ProjectAgent:
 
     config0 = {'nb_actions': 4,
-          'learning_rate': 0.005,
+          'learning_rate': 0.01,
           'gamma': 0.95,
-          'buffer_size': 10000,
+          'buffer_size': 1000000,
           'epsilon_min': 0.01,
           'epsilon_max': 1.,
-          'epsilon_decay_period': 1000,
+          'epsilon_decay_period': 10000,
           'epsilon_delay_decay': 20,
-          'batch_size': 30}
+          'batch_size': 20,
+          'criterion': torch.nn.SmoothL1Loss(beta = 1e4)}
 
     def greedy_action(self,network, state):
         with torch.no_grad():
