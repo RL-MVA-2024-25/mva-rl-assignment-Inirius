@@ -183,5 +183,5 @@ class ProjectAgent:
         pass
 
     def load(self):
-        self.model.load_state_dict(torch.load("./model-HIV.pth"))
+        self.model.load_state_dict(torch.load("src/model-HIV.pth", weights_only=True))
         pass
