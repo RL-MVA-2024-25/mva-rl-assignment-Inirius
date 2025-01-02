@@ -39,6 +39,7 @@ class HIVcnn(nn.Module):
         super(HIVcnn, self).__init__()
         self.fc1 = nn.Linear(in_channels, 100)
         self.fc2 = nn.Linear(100, 64)
+        self.fc3 = nn.Linear(64, 64)
         self.head = nn.Linear(64, n_actions)
       
     def forward(self, x):
@@ -54,9 +55,11 @@ class HIVcnn(nn.Module):
                 y.append(col_y)
             y = torch.stack(y, dim=0)
         y = F.relu(self.fc1(y))
-        y = F.dropout(y, p=0.05, training=self.training)
+        y = F.dropout(y, p=0.25, training=self.training)
         y = F.relu(self.fc2(y))
-        y = F.dropout(y, p=0.05, training=self.training)
+        y = F.dropout(y, p=0.25, training=self.training)
+        for _ in range(2):
+            y = F.relu(self.fc3(y))
         return self.head(y)
 
 class ProjectAgent:
