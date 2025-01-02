@@ -37,9 +37,8 @@ class ReplayBuffer:
 class HIVcnn(nn.Module):
     def __init__(self, in_channels=6+6*6, n_actions=4):
         super(HIVcnn, self).__init__()
-        self.fc_1 = nn.Linear(in_channels, 100)
-        self.fc1 = nn.Linear(100, 64)
-        self.fc2 = nn.Linear(64, 64)
+        self.fc1 = nn.Linear(in_channels, 100)
+        self.fc2 = nn.Linear(100, 64)
         self.head = nn.Linear(64, n_actions)
       
     def forward(self, x):
@@ -54,13 +53,10 @@ class HIVcnn(nn.Module):
                 col_y = torch.cat((col, col_y.flatten()), dim=0)
                 y.append(col_y)
             y = torch.stack(y, dim=0)
-        #x = x.view(x.size(0), x.size(1), 4, 4)
-        #x = F.relu(self.conv1(x))
-        #x = F.relu(self.conv2(x))
-        #x = x.view(x.size(0), -1)
-        y = F.relu(self.fc_1(y))
         y = F.relu(self.fc1(y))
+        y = F.dropout(y, p=0.05, training=self.training)
         y = F.relu(self.fc2(y))
+        y = F.dropout(y, p=0.05, training=self.training)
         return self.head(y)
 
 class ProjectAgent:
@@ -74,7 +70,7 @@ class ProjectAgent:
           'epsilon_decay_period': 10000,
           'epsilon_delay_decay': 20,
           'batch_size': 20,
-          'criterion': torch.nn.SmoothL1Loss(beta = 1e4)}
+          'criterion': torch.nn.SmoothL1Loss(beta = 1e2)}
 
     def greedy_action(self,network, state):
         with torch.no_grad():
@@ -116,6 +112,7 @@ class ProjectAgent:
             self.optimizer.step() 
     
     def train(self, env, max_episode):
+        self.training = True
         episode_return = []
         episode = 0
         episode_cum_reward = 0
@@ -158,14 +155,14 @@ class ProjectAgent:
                     print("Episode ", '{:2d}'.format(episode), 
                           ", epsilon ", '{:6.2f}'.format(epsilon), 
                           ", batch size ", '{:4d}'.format(len(self.memory)), 
-                          ", ep return ", '{:4.1f}'.format(episode_cum_reward),
+                          ", ep return ", '{:4.1f}'.format(episode_cum_reward*(0.0000001)),
                           sep='')
                 else:
                     episode_return.append(episode_cum_reward)
                     print("Episode ", '{:2d}'.format(episode), 
                           ", epsilon ", '{:6.2f}'.format(epsilon), 
                           ", batch size ", '{:4d}'.format(len(self.memory)), 
-                          ", ep return ", '{:4.1f}'.format(episode_cum_reward), 
+                          ", ep return ", '{:4.1f}'.format(episode_cum_reward*(0.0000001)), 
                           sep='')
 
                 
@@ -176,6 +173,7 @@ class ProjectAgent:
         return episode_return
 
     def act(self, observation, use_random=False):
+        self.training = False
         return self.greedy_action(self.model, observation)
 
     def save(self, path):
@@ -184,4 +182,21 @@ class ProjectAgent:
 
     def load(self):
         self.model.load_state_dict(torch.load("src/model-HIV.pth", weights_only=True))
+        pass
+
+
+class ProjectAgent2:
+    def __init__(self):
+        pass
+
+    def train(self, env, max_episode):
+        pass
+
+    def act(self, observation, use_random=False):
+        pass
+
+    def save(self, path):
+        pass
+
+    def load(self):
         pass
