@@ -35,7 +35,7 @@ class ReplayBuffer:
         return len(self.data)
 
 class HIVcnn(nn.Module):
-    def __init__(self, in_channels=6+6*6, n_actions=4):
+    def __init__(self, in_channels=6, n_actions =4):   #+6*6, n_actions=4):
         super(HIVcnn, self).__init__()
         self.fc1 = nn.Linear(in_channels, 100)
         self.fc2 = nn.Linear(100, 64)
@@ -43,6 +43,8 @@ class HIVcnn(nn.Module):
         self.head = nn.Linear(64, n_actions)
       
     def forward(self, x):
+        y = x
+        """
         if x.dim() == 1:
             y = torch.outer(x, x)
             y = torch.cat((x, y.flatten()), dim=0)
@@ -54,11 +56,12 @@ class HIVcnn(nn.Module):
                 col_y = torch.cat((col, col_y.flatten()), dim=0)
                 y.append(col_y)
             y = torch.stack(y, dim=0)
+        """
         y = F.relu(self.fc1(y))
         y = F.dropout(y, p=0.25, training=self.training)
         y = F.relu(self.fc2(y))
         y = F.dropout(y, p=0.25, training=self.training)
-        for _ in range(2):
+        for _ in range(50):
             y = F.relu(self.fc3(y))
         return self.head(y)
 
@@ -68,7 +71,7 @@ class ProjectAgent:
           'learning_rate': 0.01,
           'gamma': 0.95,
           'buffer_size': 1000000,
-          'epsilon_min': 0.01,
+          'epsilon_min': 0.1,
           'epsilon_max': 1.,
           'epsilon_decay_period': 10000,
           'epsilon_delay_decay': 20,
