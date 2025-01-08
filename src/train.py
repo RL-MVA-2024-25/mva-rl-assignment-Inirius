@@ -14,6 +14,7 @@ env = TimeLimit(
 )  # The time wrapper limits the number of steps in an episode at 200.
 # Now is the floor is yours to implement the agent and train it.
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # You have to implement your own agent.
 # Don't modify the methods names and signatures, but you can add methods.
@@ -87,7 +88,7 @@ class ProjectAgent:
             return torch.argmax(Q).item()
 
     def __init__(self, config = config0):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = device
         self.model = HIVcnn(config["in_channels"], config["hidden_dim"], config["nb_actions"] ).to(self.device)
         self.nb_actions = config['nb_actions']
         self.gamma = config['gamma'] if 'gamma' in config.keys() else 0.95
@@ -209,7 +210,7 @@ class ProjectAgent:
         pass
 
     def load(self):
-        self.model.load_state_dict(torch.load("src/model-HIV.pth", weights_only=True))
+        self.model.load_state_dict(torch.load("src/model-HIV.pth", weights_only=True, map_location=self.device))
         pass
 
 if __name__ == "__main__":
