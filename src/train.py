@@ -8,9 +8,10 @@ import random
 from copy import deepcopy
 import os
 import argparse
+from fast_env import FastHIVPatient
 
 env = TimeLimit(
-    env=HIVPatient(domain_randomization=False), max_episode_steps=200
+    env=FastHIVPatient(domain_randomization=False), max_episode_steps=200
 )  # The time wrapper limits the number of steps in an episode at 200.
 # Now is the floor is yours to implement the agent and train it.
 
@@ -212,19 +213,8 @@ class ProjectAgent:
         self.model.load_state_dict(torch.load("src/model-HIV.pth", weights_only=True))
         pass
 
-
-class ProjectAgent2:
-    def __init__(self):
-        pass
-
-    def train(self, env, max_episode):
-        pass
-
-    def act(self, observation, use_random=False):
-        pass
-
-    def save(self, path):
-        pass
-
-    def load(self):
-        pass
+if __name__ == "__main__":
+    agent = ProjectAgent()
+    agent.train(env)
+    agent.save("src/model-HIV.pth")
+    pass
