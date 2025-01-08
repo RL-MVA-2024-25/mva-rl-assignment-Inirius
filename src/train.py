@@ -6,6 +6,8 @@ import torch
 import numpy as np
 import random
 from copy import deepcopy
+import os
+import argparse
 
 env = TimeLimit(
     env=HIVPatient(domain_randomization=False), max_episode_steps=200
@@ -35,48 +37,49 @@ class ReplayBuffer:
         return len(self.data)
 
 class HIVcnn(nn.Module):
-    def __init__(self, in_channels=6, n_actions =4):   #+6*6, n_actions=4):
-        super(HIVcnn, self).__init__()
-        self.fc1 = nn.Linear(in_channels, 100)
-        self.fc2 = nn.Linear(100, 64)
-        self.fc3 = nn.Linear(64, 64)
-        self.head = nn.Linear(64, n_actions)
+    def __init__(self, in_channels, hidden_dim, n_actions):
+        super().__init__()
+        self.value = self.branch(in_channels, hidden_dim, n_actions)
+        self.advantage = self.branch(in_channels, hidden_dim, n_actions)
+
+    def branch(self, in_channels, hidden_dim, n_actions):
+        return nn.Sequential(
+            nn.Linear(in_channels, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, n_actions)
+        )
       
     def forward(self, x):
-        y = x
-        """
-        if x.dim() == 1:
-            y = torch.outer(x, x)
-            y = torch.cat((x, y.flatten()), dim=0)
-        elif x.dim() == 2:
-            y = []
-            for i in range(x.size(0)):
-                col = x[i , :]
-                col_y = torch.outer(col, col)
-                col_y = torch.cat((col, col_y.flatten()), dim=0)
-                y.append(col_y)
-            y = torch.stack(y, dim=0)
-        """
-        y = F.relu(self.fc1(y))
-        y = F.dropout(y, p=0.25, training=self.training)
-        y = F.relu(self.fc2(y))
-        y = F.dropout(y, p=0.25, training=self.training)
-        for _ in range(50):
-            y = F.relu(self.fc3(y))
-        return self.head(y)
+        value = self.value(x)
+        advantage = self.advantage(x)
+        return value + advantage - advantage.mean()
 
 class ProjectAgent:
 
     config0 = {'nb_actions': 4,
-          'learning_rate': 0.01,
-          'gamma': 0.95,
+          'in_channels': 6,
+          'learning_rate': 0.001,
+          'gamma': 0.99,
           'buffer_size': 1000000,
-          'epsilon_min': 0.1,
+          'initial_memory_size': 1024,
+          'epsilon_min': 0.01,
           'epsilon_max': 1.,
           'epsilon_decay_period': 10000,
-          'epsilon_delay_decay': 20,
-          'batch_size': 20,
-          'criterion': torch.nn.SmoothL1Loss(beta = 1e2)}
+          'epsilon_delay_decay': 400,
+          'batch_size': 1024,
+          'episode_max_length': 300,
+          'gradient_steps': 2,
+          'hidden_dim': 512,
+          'update_target_freq': 600,
+          'update_target_tau': 0.001,
+          'update_target_strategy': 'ema',
+          'criterion': nn.SmoothL1Loss()}
 
     def greedy_action(self,network, state):
         with torch.no_grad():
@@ -85,11 +88,12 @@ class ProjectAgent:
 
     def __init__(self, config = config0):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = HIVcnn().to(self.device)
+        self.model = HIVcnn(config["in_channels"], config["hidden_dim"], config["nb_actions"] ).to(self.device)
         self.nb_actions = config['nb_actions']
         self.gamma = config['gamma'] if 'gamma' in config.keys() else 0.95
         self.batch_size = config['batch_size'] if 'batch_size' in config.keys() else 100
         buffer_size = config['buffer_size'] if 'buffer_size' in config.keys() else int(1e5)
+        self.initial_memory_size = config['initial_memory_size'] if 'initial_memory_size' in config.keys() else 1000
         self.memory = ReplayBuffer(buffer_size,self.device)
         self.epsilon_max = config['epsilon_max'] if 'epsilon_max' in config.keys() else 1.
         self.epsilon_min = config['epsilon_min'] if 'epsilon_min' in config.keys() else 0.01
@@ -105,9 +109,11 @@ class ProjectAgent:
         self.update_target_freq = config['update_target_freq'] if 'update_target_freq' in config.keys() else 20
         self.update_target_tau = config['update_target_tau'] if 'update_target_tau' in config.keys() else 0.005
         self.monitoring_nb_trials = config['monitoring_nb_trials'] if 'monitoring_nb_trials' in config.keys() else 0
+        self.episode_count = 0
+        self.max_ep = config['episode_max_length'] if 'episode_max_length' in config.keys() else 300
 
     def gradient_step(self):
-        if len(self.memory) > self.batch_size:
+        if len(self.memory) >= self.batch_size:
             X, A, R, Y, D = self.memory.sample(self.batch_size)
             QYmax = self.target_model(Y).max(1)[0].detach()
             update = torch.addcmul(R, 1-D, QYmax, value=self.gamma)
@@ -116,8 +122,24 @@ class ProjectAgent:
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step() 
+
+    def init_replay_buffer(self, env):
+        state, _ = env.reset()
+        for _ in range(self.initial_memory_size):
+            action = env.action_space.sample()
+            next_state, reward, done, trunc, _ = env.step(action)
+            self.memory.append(state, action, reward, next_state, done)
+            if done or trunc:
+                state, _ = env.reset()
+            else:
+                state = next_state
+        self.episode_count += 1
     
-    def train(self, env, max_episode):
+    def train(self, env, max_episode = None):
+        if self.episode_count == 0:
+            self.init_replay_buffer(env)
+        if max_episode is None:
+            max_episode = self.max_ep
         self.training = True
         episode_return = []
         episode = 0
@@ -150,7 +172,7 @@ class ProjectAgent:
                 model_state_dict = self.model.state_dict()
                 tau = self.update_target_tau
                 for key in model_state_dict:
-                    target_state_dict[key] = tau*model_state_dict + (1-tau)*target_state_dict
+                    target_state_dict[key] = tau*model_state_dict[key] + (1-tau)*target_state_dict[key]
                 self.target_model.load_state_dict(target_state_dict)
             # next transition
             step += 1
