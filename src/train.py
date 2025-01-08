@@ -211,6 +211,7 @@ class ProjectAgent:
 
     def load(self):
         self.model.load_state_dict(torch.load("src/model-HIV.pth", weights_only=True, map_location=self.device))
+        self.target_model = deepcopy(self.model).to(self.device)
         pass
 
 if __name__ == "__main__":
