@@ -215,6 +215,8 @@ class ProjectAgent:
 
 if __name__ == "__main__":
     agent = ProjectAgent()
+    print("Training the agent")
     agent.train(env)
     agent.save("src/model-HIV.pth")
+    print("Agent trained and saved")
     pass
