@@ -135,6 +135,13 @@ class ProjectAgent:
             else:
                 state = next_state
         self.episode_count += 1
+
+    def bi_train(self, env_fix, env_rand, times, max_ep_fix = None, max_ep_rand = None):
+        ep_return = []
+        for _ in range (times) :
+            ep_return += self.train(env_fix, max_ep_fix)
+            ep_return += self.train(env_rand, max_ep_rand)
+        return ep_return
     
     def train(self, env, max_episode = None):
         if self.episode_count == 0:
