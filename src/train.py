@@ -76,7 +76,7 @@ class ProjectAgent:
           'batch_size': 1024,
           'episode_max_length': 300,
           'gradient_steps': 2,
-          'hidden_dim': 512,
+          'hidden_dim': 1024,
           'update_target_freq': 600,
           'update_target_tau': 0.001,
           'update_target_strategy': 'ema',
